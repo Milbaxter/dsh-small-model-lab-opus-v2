@@ -1,0 +1,30 @@
+{
+ "source": "laude-institute/terminal-bench original-tasks",
+ "commit": "d28711d0da2675d0bb1d56de45ae5df6082438a3",
+ "rule": "difficulty==easy, single 'client' service, category not in {machine-learning, model-training, scientific-computing, security}; random.Random(20260928).sample(pool, 20)",
+ "registered": "2026-09-28, before any loop iteration or champion",
+ "pool_size": 49,
+ "tasks": [
+  "aimo-airline-departures",
+  "analyze-access-logs",
+  "broken-python",
+  "create-bucket",
+  "cross-entropy-method",
+  "fix-pandas-version",
+  "fix-permissions",
+  "flood-monitoring-basic",
+  "grid-pattern-transform",
+  "hdfs-deployment",
+  "hello-world",
+  "ilp-solver",
+  "jupyter-notebook-server",
+  "log-summary",
+  "mixed-integer-programming",
+  "multistep-definite-integral",
+  "pandas-sql-query",
+  "recover-accuracy-log",
+  "schedule-vacation",
+  "setup-custom-dev-env"
+ ],
+ "protocol": "plain DSH (standard arm) vs final champion, paired, k=3, same time window; never used for tuning"
+}
