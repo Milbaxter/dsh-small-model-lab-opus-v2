@@ -1,0 +1,28 @@
+# Model layer shared by every arm: route all model calls through the local
+# pinning proxy (lab/orproxy.py). The proxy holds the real OpenRouter key and
+# forces model/provider/sampling; DSH only sees a dummy key.
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      lab:
+        displayName: Lab Qwen3-8B
+        apiKeyEnv: LAB_API_KEY
+        api: openai-completions
+        baseURL: !!js process.env.LAB_BASE_URL
+        compat:
+          supportsDeveloperRole: false
+          maxTokensField: max_tokens
+          supportsStore: false
+          supportsReasoningEffort: false
+        models:
+          - id: qwen/qwen3-8b
+            name: Qwen3-8B
+            contextWindow: !!js Number(process.env.LAB_CONTEXT_WINDOW ?? 32768)
+            maxTokens: 4096
+            reasoningEfforts: false
+# Privacy/isolation: never upload session logs or telemetry.
+- id: session-log-deepseek
+  name: '@deepseek-ai/dsh-session-log-deepseek'
+  config:
+    enabled: false

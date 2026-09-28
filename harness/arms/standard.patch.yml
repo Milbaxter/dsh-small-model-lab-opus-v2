@@ -1,0 +1,18 @@
+# `standard`: the shipped `sdk` profile (dsh-base + sdk-app) with only what the
+# offline lab requires changed.
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: lab
+    model: qwen/qwen3-8b
+- id: session-telemetry-otel
+  disabled: true
+# Tasks are offline; web search needs a DeepSeek key. Disabled for every arm.
+- id: tool-web
+  disabled: true
+- id: web-search-deepseek
+  disabled: true
+- id: web
+  disabled: true
+- id: web-fetch-http
+  disabled: true

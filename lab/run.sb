@@ -1,0 +1,22 @@
+(version 1)
+(allow default)
+; --- reads: hide the task bank, other runs, and host secrets from the agent
+(deny file-read-data (subpath (param "TASKS")) (subpath (param "RUNS"))
+  (subpath (string-append (param "REALHOME") "/.ssh"))
+  (subpath (string-append (param "REALHOME") "/.config"))
+  (subpath (string-append (param "REALHOME") "/.hermes"))
+  (subpath (string-append (param "REALHOME") "/.codex"))
+  (subpath (string-append (param "REALHOME") "/.claude"))
+  (literal (param "DOTENV")))
+(allow file-read-data (subpath (param "RUNDIR")))
+; --- writes: only this run's directories and temp
+(deny file-write*)
+(allow file-write*
+  (subpath (param "RUNDIR"))
+  (subpath (param "TMP"))
+  (subpath "/private/var/folders")
+  (subpath "/private/tmp")
+  (literal "/dev/null") (literal "/dev/tty") (literal "/dev/ptmx") (regex #"^/dev/fd/") (regex #"^/dev/ttys"))
+; --- network: only the local pinning proxy
+(deny network-outbound)
+(allow network-outbound (remote ip "localhost:*") (remote unix-socket))

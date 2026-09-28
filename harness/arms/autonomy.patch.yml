@@ -1,0 +1,6 @@
+# `standard + autonomy-policy`: plugin copied verbatim from
+# Milbaxter/optimal-deepseek-harness-setup (plugins/autonomy-policy/index.js).
+# Relative plugin paths in inserted rows resolve beside this patch file.
+- insert:
+    - id: optimal-autonomy-policy
+      name: ../plugins/autonomy-policy/index.js

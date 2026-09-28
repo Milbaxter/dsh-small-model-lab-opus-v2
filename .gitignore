@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+runs/
+*.tgz
+node_modules/
+lab/assets/*.json
+*.log
