@@ -28,7 +28,7 @@ def main() -> None:
                 cwd=spec["ws"],
                 provider="lab",
                 model="qwen/qwen3-8b",
-                max_tokens=4096,
+                max_tokens=int(os.environ.get("LAB_MAX_TOKENS", "4096")),
                 profile=spec["profile"],
                 patches=tuple(spec["patches"]),
                 request_timeout_seconds=spec["session_timeout"],

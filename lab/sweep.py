@@ -34,6 +34,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SB = ROOT / "lab" / "run.sb"
 PY = sys.executable
 PROXY = os.environ.get("LAB_PROXY", "http://127.0.0.1:18080")
+MODES = {"nothink": {"LAB_CONTEXT_WINDOW": "32768", "LAB_MAX_TOKENS": "4096"},
+         "think": {"LAB_CONTEXT_WINDOW": "131072", "LAB_MAX_TOKENS": "16384"}}
+MODE = "nothink"
 
 
 def load_tasks(root: Path, splits: list[str], only: set[str] | None) -> list[dict]:
@@ -126,19 +129,22 @@ def run_one(task: dict, arm: armreg.Arm, rep: int, sweep_dir: Path, sweep: str, 
     src = task["dir"] / "workspace"
     if src.exists():
         shutil.copytree(src, ws, dirs_exist_ok=True, symlinks=True)
+    truth = ROOT / "runs" / "_truth" / rid   # outside the agent-readable run dir
+    shutil.rmtree(truth, ignore_errors=True)
+    truth.mkdir(parents=True)
     if (task["dir"] / "setup.py").exists():
-        subprocess.run([PY, str(task["dir"] / "setup.py"), str(ws), str(rep)], check=True, timeout=120)
+        subprocess.run([PY, str(task["dir"] / "setup.py"), str(ws), str(rep), str(truth)], check=True, timeout=120)
 
     budget = task.get("budget", {})
     max_calls = int(budget.get("max_calls", 30))
     sess_timeout = float(budget.get("timeout", 480))
     faults_dir = ROOT / "runs" / "faults"
     faults_dir.mkdir(parents=True, exist_ok=True)
-    (faults_dir / f"{rid}.json").write_text(json.dumps({"max_calls": max_calls * len(task["prompts"]),
+    (faults_dir / f"{rid}.json").write_text(json.dumps({"max_calls": max_calls * len(task["prompts"]), "mode": MODE,
                                                         **(task.get("api_faults") or {})}))
 
     env = base_env(tmp.resolve(), fakehome.resolve())
-    env.update(LAB_BASE_URL=f"{PROXY}/r/{rid}/v1", LAB_API_KEY="lab-dummy")
+    env.update(LAB_BASE_URL=f"{PROXY}/r/{rid}/v1", LAB_API_KEY="lab-dummy", **MODES[MODE])
     spec = {"prompts": task["prompts"], "home": str(home.resolve()), "ws": str(ws), "profile": arm.profile,
             "patches": arm.all_patches(), "session_timeout": sess_timeout,
             "result": str((rdir / "worker.json").resolve())}
@@ -151,7 +157,8 @@ def run_one(task: dict, arm: armreg.Arm, rep: int, sweep_dir: Path, sweep: str, 
 
     # Grade outside the agent's view: hidden files are copied next to (not into) the workspace.
     gdir = (rdir / "grade").resolve()
-    shutil.copytree(task["dir"], gdir, ignore=shutil.ignore_patterns("workspace"))
+    shutil.copytree(task["dir"], gdir, ignore=shutil.ignore_patterns("workspace", "ref"))
+    shutil.copytree(truth, gdir / "truth")
     genv = base_env(tmp.resolve(), fakehome.resolve())
     grc, gkilled, gout = sandboxed([PY, str(gdir / "grade.py"), str(ws), str(rdir.resolve() / "worker.json")],
                                    rdir.resolve(), tmp.resolve(), genv, 180)
@@ -195,7 +202,10 @@ def main() -> None:
     ap.add_argument("--only", default="")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--stop-at-usd", type=float, default=18.5, help="stop scheduling when ledger total passes this")
+    ap.add_argument("--mode", default="nothink", choices=sorted(MODES))
     a = ap.parse_args()
+    global MODE
+    MODE = a.mode
 
     tasks = load_tasks(Path(a.tasks), a.split.split(","), set(a.only.split(",")) if a.only else None)
     arms = [armreg.resolve(s) for s in a.arms.split(",")]
@@ -217,6 +227,7 @@ def main() -> None:
     start_cost = ledger.total
     print(f"sweep {a.sweep}: {len(tasks)} tasks x {len(arms)} arms x k={a.k} = {len(jobs)} runs; ledger ${start_cost:.3f}", flush=True)
     done = 0
+    sweep_cost = 0.0
     stop = threading.Event()
 
     def guarded(job):
@@ -239,11 +250,12 @@ def main() -> None:
             if r is None:
                 continue
             done += 1
+            sweep_cost += r["usage"]["cost"]
             print(f"[{done}/{len(jobs)}] {r['arm']:<12} {r['task']:<28} r{r['rep']} {r['tag']:<16} "
-                  f"calls={r['usage']['calls']:<3} ${r['usage']['cost']:.4f} {r['wall']}s  sweep=${ledger.total - start_cost:.3f}",
+                  f"calls={r['usage']['calls']:<3} ${r['usage']['cost']:.4f} {r['wall']}s  sweep=${sweep_cost:.3f} ledger=${ledger.total:.2f}",
                   flush=True)
     ledger.refresh()
-    print(f"DONE sweep {a.sweep}: {done} runs, sweep cost ${ledger.total - start_cost:.3f}, ledger total ${ledger.total:.3f}"
+    print(f"DONE sweep {a.sweep}: {done} runs, sweep cost ${sweep_cost:.3f}, ledger total ${ledger.total:.3f}"
           + ("  (STOPPED: budget)" if stop.is_set() else ""), flush=True)
 
 

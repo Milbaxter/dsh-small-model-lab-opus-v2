@@ -9,8 +9,12 @@ from pathlib import Path
 
 import zstandard
 
-TAGS = ["PASS", "INFRA", "TIMEOUT", "MAX_TURNS", "CONTEXT_OVERFLOW", "IDLE_LOOP",
+TAGS = ["PASS", "INFRA", "TIMEOUT", "MAX_TURNS", "CONTEXT_OVERFLOW", "IDLE_LOOP", "STOPPED_EARLY",
         "WRONG_VERIFY", "BAD_EDIT", "REFUSAL", "REASONING"]
+
+# Ended the turn announcing or describing work instead of doing it (harness-watch
+# taxonomy extension for small models).
+EARLY_RE = re.compile(r"(let'?s |let me |we need to |i will |i'll |next,? (we|i) |here'?s the (corrected|updated|fixed)|you can (fix|update|run)|to fix this|should be (changed|updated)|```)", re.I)
 
 CLAIM_RE = re.compile(r"\b(done|complete[d]?|success(fully)?|fixed|all tests pass|passes|passed|resolved|finished|created)\b", re.I)
 
@@ -79,6 +83,8 @@ def tag(passed: bool, result: dict, summary: dict, usage: dict, killed: bool) ->
     if summary["tool_calls"] == 0:
         return "REFUSAL"
     final = (sessions[-1].get("final_response") or "")
+    if EARLY_RE.search(final[-1500:]):
+        return "STOPPED_EARLY"
     if CLAIM_RE.search(final):
         return "WRONG_VERIFY"
     edit_errors = sum(1 for c in summary["calls"] if c.get("error") and c["name"] in ("edit", "write", "str_replace_editor", "multi_edit"))

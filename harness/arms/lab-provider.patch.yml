@@ -19,7 +19,7 @@
           - id: qwen/qwen3-8b
             name: Qwen3-8B
             contextWindow: !!js Number(process.env.LAB_CONTEXT_WINDOW ?? 32768)
-            maxTokens: 4096
+            maxTokens: !!js Number(process.env.LAB_MAX_TOKENS ?? 4096)
             reasoningEfforts: false
 # Privacy/isolation: never upload session logs or telemetry.
 - id: session-log-deepseek

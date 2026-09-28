@@ -39,7 +39,13 @@ PIN = {
     "max_tokens_cap": 4096,
 }
 
-CONTEXT_WINDOW = 32768  # Qwen3-8B native context (no YaRN); enforced here.
+# Alternative pinned mode (per run via the run plan's "mode": "think").
+# Qwen3's recommended thinking-mode sampling; larger output cap and the
+# provider's full 131k window.
+PIN_THINK = dict(PIN, temperature=0.6, top_p=0.95, top_k=20, reasoning={"enabled": True},
+                 max_tokens_cap=16384, context_window=131072)
+PIN["context_window"] = 32768
+
 
 _TOK = None
 
@@ -96,6 +102,12 @@ class Faults:
         self.root = root
         self.counts: dict[str, int] = {}
         self.lock = threading.Lock()
+
+    def mode(self, run_id: str) -> str:
+        f = self.root / f"{run_id}.json" if self.root else None
+        if f and f.exists():
+            return json.loads(f.read_text()).get("mode", "nothink")
+        return "nothink"
 
     def next(self, run_id: str) -> int | str | None:
         """Return an injected HTTP status, "budget" when the run's call budget is spent, or None."""
@@ -167,30 +179,32 @@ def make_handler(ledger: Ledger, faults: Faults, client: httpx.Client, key: str)
                 ledger.add(rec)
                 return self._json(400, {"error": {"message": f"model {body.get('model')!r} not allowed"}})
 
+            pin = PIN_THINK if faults.mode(run_id) == "think" else PIN
+            rec["mode"] = "think" if pin is PIN_THINK else "nothink"
             est = estimate_prompt_tokens(body)
             rec["est_tokens"] = est
-            out_cap = min(int(body.get("max_tokens") or body.get("max_completion_tokens") or PIN["max_tokens_cap"]), PIN["max_tokens_cap"])
-            if est + out_cap > CONTEXT_WINDOW:
+            out_cap = min(int(body.get("max_tokens") or body.get("max_completion_tokens") or pin["max_tokens_cap"]), pin["max_tokens_cap"])
+            if est + out_cap > pin["context_window"]:
                 rec.update(status="context_overflow")
                 ledger.add(rec)
                 return self._json(400, {"error": {
-                    "message": f"This model's maximum context length is {CONTEXT_WINDOW} tokens. However, you requested "
+                    "message": f"This model's maximum context length is {pin['context_window']} tokens. However, you requested "
                                f"{est + out_cap} tokens ({est} in the messages, {out_cap} in the completion). "
                                "Please reduce the length of the messages or completion.",
                     "type": "invalid_request_error", "param": "messages", "code": "context_length_exceeded"}})
 
             body["model"] = PIN["model"]
             body["provider"] = PIN["provider"]
-            body["temperature"] = PIN["temperature"]
-            body["top_p"] = PIN["top_p"]
-            body["top_k"] = PIN["top_k"]
-            body["reasoning"] = PIN["reasoning"]
+            body["temperature"] = pin["temperature"]
+            body["top_p"] = pin["top_p"]
+            body["top_k"] = pin["top_k"]
+            body["reasoning"] = pin["reasoning"]
             body.pop("reasoning_effort", None)
             for f in ("max_tokens", "max_completion_tokens"):
                 if f in body:
-                    body[f] = min(int(body[f]), PIN["max_tokens_cap"])
+                    body[f] = min(int(body[f]), pin["max_tokens_cap"])
             if "max_tokens" not in body and "max_completion_tokens" not in body:
-                body["max_tokens"] = PIN["max_tokens_cap"]
+                body["max_tokens"] = pin["max_tokens_cap"]
             body["usage"] = {"include": True}
             stream = bool(body.get("stream"))
             if stream:
@@ -250,6 +264,7 @@ def make_handler(ledger: Ledger, faults: Faults, client: httpx.Client, key: str)
                 prompt_tokens=usage.get("prompt_tokens"),
                 completion_tokens=usage.get("completion_tokens"),
                 cached_tokens=(usage.get("prompt_tokens_details") or {}).get("cached_tokens"),
+                reasoning_tokens=(usage.get("completion_tokens_details") or {}).get("reasoning_tokens"),
                 cost=usage.get("cost"),
                 secs=round(time.time() - t0, 2),
             )
