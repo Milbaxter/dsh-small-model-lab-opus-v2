@@ -37,6 +37,7 @@ PROXY = os.environ.get("LAB_PROXY", "http://127.0.0.1:18080")
 MODES = {"nothink": {"LAB_CONTEXT_WINDOW": "32768", "LAB_MAX_TOKENS": "4096"},
          "think": {"LAB_CONTEXT_WINDOW": "131072", "LAB_MAX_TOKENS": "16384"}}
 MODE = "nothink"
+RETRY_INFRA = False
 
 
 def load_tasks(root: Path, splits: list[str], only: set[str] | None) -> list[dict]:
@@ -118,7 +119,7 @@ def run_one(task: dict, arm: armreg.Arm, rep: int, sweep_dir: Path, sweep: str, 
     res_file = rdir / "result.json"
     if res_file.exists():
         prev = json.loads(res_file.read_text())
-        if "tag" in prev:
+        if "tag" in prev and not (RETRY_INFRA and prev["tag"] == "INFRA"):
             return prev
     if rdir.exists():
         shutil.rmtree(rdir)
@@ -203,9 +204,11 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--stop-at-usd", type=float, default=18.5, help="stop scheduling when ledger total passes this")
     ap.add_argument("--mode", default="nothink", choices=sorted(MODES))
+    ap.add_argument("--retry-infra", action="store_true", help="re-run runs previously tagged INFRA")
     a = ap.parse_args()
-    global MODE
+    global MODE, RETRY_INFRA
     MODE = a.mode
+    RETRY_INFRA = a.retry_infra
 
     tasks = load_tasks(Path(a.tasks), a.split.split(","), set(a.only.split(",")) if a.only else None)
     arms = [armreg.resolve(s) for s in a.arms.split(",")]

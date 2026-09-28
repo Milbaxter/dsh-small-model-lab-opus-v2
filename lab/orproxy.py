@@ -214,6 +214,14 @@ def make_handler(ledger: Ledger, faults: Faults, client: httpx.Client, key: str)
                        "X-Title": "dsh-small-model-lab-opus"}
             usage = {}
             provider = None
+            # Transient network failures on this machine (DNS/connect) are infrastructure,
+            # not model behaviour: wait them out (up to ~3 min) before failing the call.
+            for attempt in range(19):
+                try:
+                    client.head("https://openrouter.ai/api/v1/models", timeout=10)
+                    break
+                except httpx.HTTPError:
+                    time.sleep(10)
             try:
                 with client.stream("POST", UPSTREAM, json=body, headers=headers) as r:
                     if r.status_code != 200 or not stream:
