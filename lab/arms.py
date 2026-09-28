@@ -50,6 +50,22 @@ def resolve(spec: str) -> Arm:
     else:
         d = ROOT / "harness" / spec
         name = spec.replace("/", "-")
+    if not (d / "arm.yaml").exists() and (d / "package.json").exists():
+        # A plain DSH bundle package: {"dsh": {"bundle": {"patch": "./cordis.patch.yml"}}}.
+        # Its patch inserts rows by package name; rewrite them to absolute module paths
+        # so the bundle can be evaluated without `dsh plugin add` (same composition).
+        import json as _json
+        pkg = _json.loads((d / "package.json").read_text())
+        patch = (d / pkg["dsh"]["bundle"]["patch"]).resolve()
+        rows = yaml.safe_load(patch.read_text())
+        main = (d / pkg.get("main", "index.js")).resolve()
+        for row in rows:
+            for ins in row.get("insert", []) if isinstance(row, dict) else []:
+                if ins.get("name") == pkg["name"]:
+                    ins["name"] = str(main)
+        out = d / ".lab-eval.patch.yml"
+        out.write_text(yaml.safe_dump(rows, sort_keys=False))
+        return Arm("ext-" + pkg["name"], "sdk", STANDARD_BASE + [out])
     meta = yaml.safe_load((d / "arm.yaml").read_text())
     prof = meta.get("profile", "sdk")
     patches: list[Path] = []

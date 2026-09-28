@@ -1,0 +1,4 @@
+name: stop-guard
+profile: sdk
+base: standard
+patches: [stop-guard.patch.yml]

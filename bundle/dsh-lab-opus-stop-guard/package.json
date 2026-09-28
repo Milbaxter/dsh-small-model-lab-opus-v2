@@ -1,0 +1,9 @@
+{
+  "name": "dsh-lab-opus-stop-guard",
+  "version": "0.1.0",
+  "description": "Bounded Stop hook for DeepSeek Harness: continues a turn when a small model ends it by describing work instead of doing it. UNVALIDATED candidate.",
+  "type": "module",
+  "main": "index.js",
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
+  "license": "MIT"
+}

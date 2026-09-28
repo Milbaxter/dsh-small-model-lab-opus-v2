@@ -1,0 +1,5 @@
+- insert:
+    - id: lab-stop-guard
+      name: ./stop-guard.js
+      config:
+        maxNudgesPerTurn: 2

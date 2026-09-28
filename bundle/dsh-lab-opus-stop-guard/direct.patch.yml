@@ -1,0 +1,6 @@
+# Use without installing: dsh --profile sdk --patch /abs/path/direct.patch.yml
+- insert:
+    - id: lab-stop-guard
+      name: ./index.js
+      config:
+        maxNudgesPerTurn: 2

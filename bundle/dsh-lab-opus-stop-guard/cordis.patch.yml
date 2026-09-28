@@ -1,0 +1,5 @@
+- insert:
+    - id: lab-stop-guard
+      name: dsh-lab-opus-stop-guard
+      config:
+        maxNudgesPerTurn: 2
